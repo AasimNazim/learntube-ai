@@ -33,7 +33,25 @@ class RAGPipeline:
         """
         video = db.query(Video).filter((Video.id == video_id) | (Video.youtube_id == video_id)).first()
         if not video:
-            raise ValueError(f"Video {video_id} not found")
+            try:
+                from app.services.processing_service import ProcessingService
+                import asyncio
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        import nest_asyncio
+                        nest_asyncio.apply()
+                        video = loop.run_until_complete(ProcessingService.process_video_url(db, video_url, user_id=user_id))
+                    else:
+                        video = loop.run_until_complete(ProcessingService.process_video_url(db, video_url, user_id=user_id))
+                except Exception:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    video = loop.run_until_complete(ProcessingService.process_video_url(db, video_url, user_id=user_id))
+                    loop.close()
+            except Exception as pe:
+                raise ValueError(f"Video {video_id} not found. Please paste the YouTube video URL to process it first.")
 
         # Fetch recent conversation history for follow-up context
         recent_history_objs = db.query(TutorMessage).filter(
