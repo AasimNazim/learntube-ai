@@ -15,8 +15,10 @@ try:
         pass
 except Exception as e:
     print(f"Warning: Could not connect to primary DATABASE_URL ({db_url}). Error: {e}")
-    print("Falling back to local SQLite database (sqlite:///./learntube.db)...")
-    db_url = "sqlite:///./learntube.db"
+    import os, tempfile
+    db_path = os.path.join(tempfile.gettempdir(), "learntube.db")
+    print(f"Falling back to SQLite database ({db_path})...")
+    db_url = f"sqlite:///{db_path}"
     engine_kwargs = {"connect_args": {"check_same_thread": False}}
     engine = create_engine(db_url, **engine_kwargs)
 
