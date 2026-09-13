@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # AI / Gemini
     GEMINI_API_KEY: str = ""
-    GENERATION_MODEL: str = "gemini-2.5-flash"
+    GENERATION_MODEL: str = "gemini-3.5-flash"
     EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIMENSION: int = 768
     

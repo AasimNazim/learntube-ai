@@ -25,8 +25,8 @@ const defaultStrong = ["Key Principles", "Basic Definitions", "Core Workflows"];
 const defaultWeak = ["Advanced Edge Cases", "System Trade-offs"];
 
 const defaultRecommendations = [
-  { concept: "Advanced Edge Cases", section: "Edge Cases Breakdown", ts: "04:15", reason: "Review boundary condition questions." },
-  { concept: "System Trade-offs", section: "Optimization & Trade-offs", ts: "08:30", reason: "Re-read trade-off comparisons." },
+  { concept: "Advanced Edge Cases", section: "Edge Cases Breakdown", source_timestamp: "04:15", ts: "04:15", reason: "Review boundary condition questions." },
+  { concept: "System Trade-offs", section: "Optimization & Trade-offs", source_timestamp: "08:30", ts: "08:30", reason: "Re-read trade-off comparisons." },
 ];
 
 export default function QuizResults({ results, onReview, onRetry }: QuizResultsProps) {

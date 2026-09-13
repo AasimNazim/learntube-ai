@@ -79,9 +79,21 @@ async def process_video(
             detail=f"Failed to process video: {str(e)}"
         )
 
-@router.get("/{video_id}", response_model=VideoDetailResponse)
-def get_video_detail(video_id: str, db: Session = Depends(get_db)):
+async def _ensure_video_processed(db: Session, video_id: str) -> Video:
     video = db.query(Video).filter((Video.id == video_id) | (Video.youtube_id == video_id)).first()
+    if not video or not video.concepts or len(video.concepts) == 0 or not video.chapters or len(video.chapters) == 0:
+        url = video.url if video else f"https://www.youtube.com/watch?v={video_id}"
+        try:
+            video = await ProcessingService.process_video_url(db, url)
+        except Exception:
+            pass
+        if not video:
+            video = db.query(Video).filter((Video.id == video_id) | (Video.youtube_id == video_id)).first()
+    return video
+
+@router.get("/{video_id}", response_model=VideoDetailResponse)
+async def get_video_detail(video_id: str, db: Session = Depends(get_db)):
+    video = await _ensure_video_processed(db, video_id)
     if not video:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
@@ -103,8 +115,8 @@ def get_video_detail(video_id: str, db: Session = Depends(get_db)):
     )
 
 @router.get("/{video_id}/concepts", response_model=List[ConceptResponse])
-def get_video_concepts(video_id: str, db: Session = Depends(get_db)):
-    video = db.query(Video).filter((Video.id == video_id) | (Video.youtube_id == video_id)).first()
+async def get_video_concepts(video_id: str, db: Session = Depends(get_db)):
+    video = await _ensure_video_processed(db, video_id)
     if not video:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
@@ -121,8 +133,8 @@ def get_video_concepts(video_id: str, db: Session = Depends(get_db)):
     ]
 
 @router.get("/{video_id}/chapters", response_model=List[ChapterResponse])
-def get_video_chapters(video_id: str, db: Session = Depends(get_db)):
-    video = db.query(Video).filter((Video.id == video_id) | (Video.youtube_id == video_id)).first()
+async def get_video_chapters(video_id: str, db: Session = Depends(get_db)):
+    video = await _ensure_video_processed(db, video_id)
     if not video:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 

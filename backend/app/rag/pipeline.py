@@ -180,7 +180,7 @@ USER QUESTION:
                 except Exception as model_err:
                     import logging
                     logging.warning(f"RAG generation error with {settings.GENERATION_MODEL}: {model_err}. Trying alternate model...")
-                    alt_models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+                    alt_models = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"]
                     response = None
                     for alt in alt_models:
                         if alt == settings.GENERATION_MODEL:

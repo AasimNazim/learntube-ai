@@ -39,21 +39,34 @@ class GeminiService:
                 lines.append(f"[{int(st)}s] {txt}")
             formatted_text = "\n".join(lines)
 
-        # 1. Try real Gemini 2.5 Flash if key is configured
+        # 1. Try real Gemini models with multi-model fallback cascade
         if HAS_GENAI and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("placeholder"):
             try:
                 client = genai.Client(api_key=settings.GEMINI_API_KEY)
                 prompt = cls._build_extraction_prompt(formatted_text, video_title)
                 
-                response = client.models.generate_content(
-                    model=settings.GENERATION_MODEL,
-                    contents=prompt
-                )
+                models_cascade = [
+                    settings.GENERATION_MODEL,
+                    "gemini-3.5-flash",
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.1-flash-lite",
+                    "gemini-3.6-flash"
+                ]
+                seen = set()
+                unique_models = [m for m in models_cascade if not (m in seen or seen.add(m))]
 
-                if response and hasattr(response, "text") and response.text:
-                    parsed = cls._parse_json_response(response.text)
-                    if parsed:
-                        return GeminiExtractionResult(**parsed)
+                for model_name in unique_models:
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        if response and hasattr(response, "text") and response.text:
+                            parsed = cls._parse_json_response(response.text)
+                            if parsed:
+                                return GeminiExtractionResult(**parsed)
+                    except Exception:
+                        continue
             except Exception:
                 pass  # Fall back on API/quota error
 

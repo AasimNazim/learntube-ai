@@ -110,6 +110,7 @@ class ProgressService:
                     timestamp_formatted="01:15"
                 ))
                 reviews.append(ReviewItemSchema(
+                    video_id=g.video_id,
                     concept=g.concept_name,
                     video_title=v_title,
                     timestamp_formatted="01:15",

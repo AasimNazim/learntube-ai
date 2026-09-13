@@ -7,6 +7,9 @@ engine_kwargs = {}
 
 if db_url.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif db_url.startswith("postgresql"):
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
 
 try:
     engine = create_engine(db_url, **engine_kwargs)

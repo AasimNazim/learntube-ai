@@ -87,7 +87,7 @@ export async function getVideoConcepts(videoId: string) {
       name: string;
       description?: string;
       timestamp_seconds: number;
-      timestamp_formatted: str;
+      timestamp_formatted: string;
       difficulty: string;
     }[]
   >(`/api/videos/${videoId}/concepts`);
@@ -101,7 +101,7 @@ export async function getVideoChapters(videoId: string) {
       summary?: string;
       start_seconds: number;
       end_seconds?: number;
-      timestamp_formatted: str;
+      timestamp_formatted: string;
     }[]
   >(`/api/videos/${videoId}/chapters`);
 }
@@ -123,7 +123,7 @@ export async function getSegmentExplanation(videoId: string, startSeconds: numbe
   return apiRequest<{
     explanation: string;
     key_concepts: string[];
-    takeaway: str;
+    takeaway: string;
     timestamp_range_formatted: string;
   }>(`/api/videos/${videoId}/segment-tutor`, {
     method: "POST",
@@ -154,7 +154,7 @@ export async function getVideoQuiz(videoId: string) {
     title: string;
     questions: {
       id: string;
-      concept_name: str;
+      concept_name: string;
       prompt: string;
       options: string[];
       correct_option_index?: number;
@@ -208,7 +208,7 @@ export async function getLearningDashboard() {
     }[];
     strengths: { concept: string; score: number }[];
     gaps: { concept: string; score: number; video_title: string; timestamp_formatted: string }[];
-    reviews: { concept: string; video_title: string; timestamp_formatted: string; reason: string }[];
+    reviews: { video_id?: string; concept: string; video_title: string; timestamp_formatted: string; reason: string }[];
   }>("/api/user/learning");
 }
 

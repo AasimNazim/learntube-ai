@@ -117,7 +117,7 @@ class QuizService:
         results_breakdown: List[QuestionResultItem] = []
 
         for i, q in enumerate(questions):
-            c_name = q.concept_name
+            c_name = q.concept_name.strip() if q.concept_name and q.concept_name.strip() else "General Concept"
             concept_total[c_name] = concept_total.get(c_name, 0) + 1
 
             user_choice = int(user_answers[i]) if i < len(user_answers) and user_answers[i] is not None else -1
@@ -151,7 +151,7 @@ class QuizService:
         for c_name, tot in concept_total.items():
             corr = concept_correct.get(c_name, 0)
             pct = (corr / tot) * 100.0
-            if pct >= 75.0:
+            if corr == tot and pct >= 80.0:
                 strong_concepts.append(c_name)
             else:
                 weak_concepts.append(c_name)
@@ -310,19 +310,27 @@ Respond ONLY with a JSON array of question objects matching this exact structure
   }}
 ]
 """
-                try:
-                    resp = client.models.generate_content(
-                        model=settings.GENERATION_MODEL,
-                        contents=prompt
-                    )
-                except Exception as model_err:
-                    import logging
-                    logging.warning(f"Quiz generation error with {settings.GENERATION_MODEL}: {model_err}. Trying alternate model...")
-                    alt_model = "gemini-flash-latest" if settings.GENERATION_MODEL != "gemini-flash-latest" else "gemini-3.5-flash-lite"
-                    resp = client.models.generate_content(
-                        model=alt_model,
-                        contents=prompt
-                    )
+                resp = None
+                models_cascade = [
+                    settings.GENERATION_MODEL,
+                    "gemini-3.5-flash",
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.1-flash-lite",
+                    "gemini-3.6-flash"
+                ]
+                seen = set()
+                unique_models = [m for m in models_cascade if not (m in seen or seen.add(m))]
+
+                for model_name in unique_models:
+                    try:
+                        resp = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        if resp and hasattr(resp, "text") and resp.text:
+                            break
+                    except Exception:
+                        continue
 
                 if resp and hasattr(resp, "text") and resp.text:
                     clean = resp.text.strip().replace("```json", "").replace("```", "").strip()

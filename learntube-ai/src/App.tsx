@@ -158,8 +158,9 @@ export default function App() {
             )}
             {screen === "learning" && (
               <MyLearning
-                onContinue={(selectedVid?: string) => {
+                onContinue={(selectedVid?: string, seekTime?: string) => {
                   if (selectedVid) setVideoId(selectedVid);
+                  if (seekTime) setInitialSeekTime(seekTime);
                   setScreen("workspace");
                 }}
               />

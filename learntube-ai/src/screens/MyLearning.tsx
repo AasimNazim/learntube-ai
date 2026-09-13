@@ -3,7 +3,7 @@ import { BookOpen, Clock, Target, TrendingUp, TrendingDown, Play, ArrowRight, Ba
 import { getLearningDashboard } from "../services/api";
 
 interface MyLearningProps {
-  onContinue: (videoId?: string) => void;
+  onContinue: (videoId?: string, seekTime?: string) => void;
 }
 
 export default function MyLearning({ onContinue }: MyLearningProps) {
@@ -49,6 +49,7 @@ export default function MyLearning({ onContinue }: MyLearningProps) {
           if (data.reviews) {
             setReviews(
               data.reviews.map((r) => ({
+                videoId: r.video_id,
                 concept: r.concept,
                 video: r.video_title || "Course Video",
                 ts: r.timestamp_formatted || "00:00",
@@ -224,7 +225,7 @@ export default function MyLearning({ onContinue }: MyLearningProps) {
                       </p>
                     </div>
                   </div>
-                  <button onClick={() => onContinue()} className="shrink-0 ml-4 text-xs px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
+                  <button onClick={() => onContinue(r.videoId, r.ts)} className="shrink-0 ml-4 text-xs px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
                     Review
                   </button>
                 </div>

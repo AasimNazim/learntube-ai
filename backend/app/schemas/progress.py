@@ -28,6 +28,7 @@ class GapItemSchema(BaseModel):
     timestamp_formatted: str
 
 class ReviewItemSchema(BaseModel):
+    video_id: Optional[str] = None
     concept: str
     video_title: str
     timestamp_formatted: str

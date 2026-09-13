@@ -93,18 +93,32 @@ Respond ONLY with JSON containing:
 SEGMENT TRANSCRIPT:
 {segment_text}
 """
-                resp = client.models.generate_content(
-                    model=settings.GENERATION_MODEL,
-                    contents=prompt
-                )
-                if resp and hasattr(resp, "text") and resp.text:
-                    clean = resp.text.strip().replace("```json", "").replace("```", "").strip()
-                    data = json.loads(clean)
-                    return (
-                        data.get("explanation", ""),
-                        data.get("key_concepts", []),
-                        data.get("takeaway", "")
-                    )
+                models_cascade = [
+                    settings.GENERATION_MODEL,
+                    "gemini-3.5-flash",
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.1-flash-lite",
+                    "gemini-3.6-flash"
+                ]
+                seen = set()
+                unique_models = [m for m in models_cascade if not (m in seen or seen.add(m))]
+
+                for model_name in unique_models:
+                    try:
+                        resp = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        if resp and hasattr(resp, "text") and resp.text:
+                            clean = resp.text.strip().replace("```json", "").replace("```", "").strip()
+                            data = json.loads(clean)
+                            return (
+                                data.get("explanation", ""),
+                                data.get("key_concepts", []),
+                                data.get("takeaway", "")
+                            )
+                    except Exception:
+                        continue
             except Exception:
                 pass
 

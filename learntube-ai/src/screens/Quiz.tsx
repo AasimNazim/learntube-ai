@@ -97,7 +97,7 @@ export default function Quiz({ videoId, onComplete, onBack }: QuizProps) {
 
     if (!correct) {
       setConceptMisses((prev) => {
-        const updated = { ...prev, [q.concept]: (prev[q.concept] || 0) + 1 };
+        const updated: Record<string, number> = { ...prev, [q.concept]: (prev[q.concept] || 0) + 1 };
         if (updated[q.concept] >= weakConceptThreshold) setShowAdaptive(true);
         return updated;
       });

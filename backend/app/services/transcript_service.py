@@ -52,21 +52,38 @@ class TranscriptService:
         try:
             snippets = None
             lang_codes = ['en', 'en-IN', 'en-US', 'en-GB', 'hi', 'ur']
+            api = YouTubeTranscriptApi()
+
+            # 1. Try api.fetch with languages
             try:
-                ytt = YouTubeTranscriptApi()
+                fetched = api.fetch(video_id, languages=lang_codes)
+                snippets = getattr(fetched, 'snippets', fetched)
+            except Exception:
+                pass
+
+            # 2. Try api.fetch without languages
+            if not snippets:
                 try:
-                    tx_list = ytt.list(video_id)
+                    fetched = api.fetch(video_id)
+                    snippets = getattr(fetched, 'snippets', fetched)
+                except Exception:
+                    pass
+
+            # 3. Try listing transcripts
+            if not snippets:
+                try:
+                    tx_list = api.list(video_id)
                     try:
                         tx = tx_list.find_transcript(lang_codes)
                     except Exception:
                         tx = list(tx_list)[0] if list(tx_list) else None
                     if tx:
-                        snippets = tx.fetch()
+                        fetched = tx.fetch()
+                        snippets = getattr(fetched, 'snippets', fetched)
                 except Exception:
-                    snippets = ytt.fetch(video_id)
-            except Exception:
-                pass
+                    pass
 
+            # 4. Try static get_transcript if available in legacy versions
             if not snippets and hasattr(YouTubeTranscriptApi, 'get_transcript'):
                 try:
                     snippets = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_codes)
@@ -86,7 +103,7 @@ class TranscriptService:
                     dur = float(s.get('duration', s.get('dur', 3.0)))
                 else:
                     txt = str(getattr(s, 'text', '')).strip()
-                    st = float(getattr(s, 'start', 0.0))
+                    st = float(getattr(s, 'start', getattr(s, 'start_seconds', 0.0)))
                     dur = float(getattr(s, 'duration', 3.0))
 
                 if not txt:
