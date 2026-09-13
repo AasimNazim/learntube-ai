@@ -101,7 +101,7 @@ export default function Home({ onStart, onDemo }: HomeProps) {
           <div className="flex items-center justify-center gap-3 flex-wrap mt-6">
             <span className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>Try sample videos:</span>
             <button
-              onClick={() => handleSample("https://www.youtube.com/watch?v=rfscVS0vtbw")}
+              onClick={() => handleSample("https://www.youtube.com/watch?v=ORCuz7s5cCY")}
               className="text-xs px-3 py-1.5 rounded-lg border transition-all hover:bg-slate-50 font-medium"
               style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--foreground)" }}
             >

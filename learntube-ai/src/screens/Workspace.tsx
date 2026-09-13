@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Send, Play, Clock, User, BookOpen, Layers, List, Brain, HelpCircle, ExternalLink, ChevronRight, Sparkles, Info, CheckCircle } from "lucide-react";
 import {
   getVideoDetail,
@@ -11,6 +11,7 @@ import {
 
 interface WorkspaceProps {
   videoId?: string;
+  initialSeekTime?: string | number | null;
   onStartQuiz: () => void;
 }
 
@@ -28,7 +29,20 @@ function DifficultyBadge({ level }: { level: string }) {
   );
 }
 
-function SummaryTab({ videoDetail, concepts }: { videoDetail: any; concepts: any[] }) {
+function parseTimestampToSeconds(ts: number | string | undefined | null): number {
+  if (ts === undefined || ts === null) return 0;
+  if (typeof ts === "number") return isNaN(ts) ? 0 : Math.max(0, ts);
+  const str = String(ts).trim().replace(/[sS]$/, "");
+  if (!str) return 0;
+  const parts = str.split(":").map((p) => parseFloat(p));
+  if (parts.some(isNaN)) return 0;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return 0;
+}
+
+function SummaryTab({ videoDetail, concepts, onSeek }: { videoDetail: any; concepts: any[]; onSeek?: (sec: number) => void }) {
   const summaryText = videoDetail?.summary || "Processing summary for this video...";
   const takeaways = videoDetail?.key_takeaways?.length
     ? videoDetail.key_takeaways
@@ -62,13 +76,20 @@ function SummaryTab({ videoDetail, concepts }: { videoDetail: any; concepts: any
           <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--foreground)" }}>Key Concepts</h3>
           <div className="grid grid-cols-2 gap-3">
             {concepts.slice(0, 4).map((c: any) => (
-              <div key={c.id || c.name} className="p-4 rounded-xl border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <div
+                key={c.id || c.name}
+                onClick={() => onSeek?.(c.timestamp_seconds)}
+                className="p-4 rounded-xl border cursor-pointer hover:border-indigo-400 transition-all"
+                style={{ background: "var(--card)", borderColor: "var(--border)" }}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-sm" style={{ color: "var(--foreground)" }}>{c.name}</span>
                   <DifficultyBadge level={c.difficulty || "Medium"} />
                 </div>
                 <p className="text-xs mb-2 leading-relaxed" style={{ color: "var(--muted-foreground)" }}>{c.description}</p>
-                <p className="text-xs font-medium" style={{ color: "var(--primary)" }}>⏱ {c.timestamp_formatted || "00:00"}</p>
+                <p className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--primary)" }}>
+                  <Play size={11} /> ⏱ {c.timestamp_formatted || "00:00"}
+                </p>
               </div>
             ))}
           </div>
@@ -78,7 +99,7 @@ function SummaryTab({ videoDetail, concepts }: { videoDetail: any; concepts: any
   );
 }
 
-function ConceptsTab({ concepts }: { concepts: any[] }) {
+function ConceptsTab({ concepts, onSeek }: { concepts: any[]; onSeek?: (sec: number) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
 
   if (!concepts || concepts.length === 0) {
@@ -100,7 +121,10 @@ function ConceptsTab({ concepts }: { concepts: any[] }) {
           <div
             className="p-4 cursor-pointer flex items-start justify-between"
             style={{ background: "var(--card)" }}
-            onClick={() => setSelected(selected === c.name ? null : c.name)}
+            onClick={() => {
+              setSelected(selected === c.name ? null : c.name);
+              onSeek?.(c.timestamp_seconds);
+            }}
           >
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
@@ -120,10 +144,16 @@ function ConceptsTab({ concepts }: { concepts: any[] }) {
           </div>
           {selected === c.name && (
             <div className="px-4 pb-4 pt-0" style={{ background: "var(--muted)" }}>
-              <div className="flex items-center gap-2 mb-3">
+              <div
+                className="flex items-center gap-2 mb-3 cursor-pointer hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeek?.(c.timestamp_seconds);
+                }}
+              >
                 <Clock size={13} style={{ color: "var(--primary)" }} />
-                <span className="text-xs font-medium" style={{ color: "var(--primary)" }}>
-                  Source: {c.timestamp_formatted || "00:00"}
+                <span className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--primary)" }}>
+                  <Play size={11} /> Jump to Source: {c.timestamp_formatted || "00:00"}
                 </span>
               </div>
             </div>
@@ -134,7 +164,7 @@ function ConceptsTab({ concepts }: { concepts: any[] }) {
   );
 }
 
-function ChaptersTab({ chapters }: { chapters: any[] }) {
+function ChaptersTab({ chapters, onSeek }: { chapters: any[]; onSeek?: (sec: number) => void }) {
   const [active, setActive] = useState<string | null>(null);
 
   if (!chapters || chapters.length === 0) {
@@ -150,12 +180,15 @@ function ChaptersTab({ chapters }: { chapters: any[] }) {
       {chapters.map((ch: any) => (
         <div
           key={ch.id || ch.title}
-          className="flex gap-4 p-4 rounded-xl border cursor-pointer transition-all"
+          className="flex gap-4 p-4 rounded-xl border cursor-pointer transition-all hover:border-indigo-400"
           style={{
             background: active === ch.timestamp_formatted ? "var(--secondary)" : "var(--card)",
             borderColor: active === ch.timestamp_formatted ? "var(--primary)" : "var(--border)",
           }}
-          onClick={() => setActive(ch.timestamp_formatted)}
+          onClick={() => {
+            setActive(ch.timestamp_formatted);
+            onSeek?.(ch.start_seconds);
+          }}
         >
           <div className="shrink-0 pt-0.5">
             <span className="text-xs font-mono font-semibold" style={{ color: "var(--primary)" }}>
@@ -166,7 +199,7 @@ function ChaptersTab({ chapters }: { chapters: any[] }) {
             <p className="font-semibold text-sm mb-0.5" style={{ color: "var(--foreground)" }}>{ch.title}</p>
             <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{ch.summary}</p>
           </div>
-          <Play size={13} style={{ color: "var(--muted-foreground)", marginTop: 3 }} />
+          <Play size={13} style={{ color: "var(--primary)", marginTop: 3 }} />
         </div>
       ))}
     </div>
@@ -302,7 +335,7 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "teachme", label: "Teach Me", icon: Brain },
 ];
 
-export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
+export default function Workspace({ videoId, initialSeekTime, onStartQuiz }: WorkspaceProps) {
   const [tab, setTab] = useState<Tab>("summary");
   const [videoDetail, setVideoDetail] = useState<any>(null);
   const [concepts, setConcepts] = useState<any[]>([]);
@@ -316,12 +349,18 @@ export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
   ]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [seekTime, setSeekTime] = useState<number>(() => {
+    return initialSeekTime ? parseTimestampToSeconds(initialSeekTime) : 0;
+  });
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (!videoId) return;
     setVideoDetail(null);
     setConcepts([]);
     setChapters([]);
+    const startSec = initialSeekTime ? parseTimestampToSeconds(initialSeekTime) : 0;
+    setSeekTime(startSec);
     setMessages([
       {
         role: "ai",
@@ -333,6 +372,34 @@ export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
     getVideoConcepts(videoId).then(setConcepts).catch(console.error);
     getVideoChapters(videoId).then(setChapters).catch(console.error);
   }, [videoId]);
+
+  useEffect(() => {
+    if (initialSeekTime !== undefined && initialSeekTime !== null) {
+      const sec = parseTimestampToSeconds(initialSeekTime);
+      if (sec > 0) {
+        handleSeek(sec);
+      }
+    }
+  }, [initialSeekTime]);
+
+  const handleSeek = (rawSec: number | string) => {
+    const sec = Math.max(0, Math.floor(parseTimestampToSeconds(rawSec)));
+    setSeekTime(sec);
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func: "seekTo", args: [sec, true] }),
+          "*"
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+          "*"
+        );
+      } catch (err) {
+        console.error("YouTube Player Seek error:", err);
+      }
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -405,7 +472,8 @@ export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
         <div className="relative shrink-0 w-full overflow-hidden" style={{ height: "190px", background: "#000" }}>
           {videoDetail?.youtube_id ? (
             <iframe
-              src={`https://www.youtube.com/embed/${videoDetail.youtube_id}?autoplay=0&rel=0`}
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${videoDetail.youtube_id}?enablejsapi=1&autoplay=1&start=${seekTime}&rel=0`}
               title={titleText}
               className="w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -470,9 +538,9 @@ export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto" style={{ background: "var(--background)" }}>
-          {tab === "summary" && <SummaryTab videoDetail={videoDetail} concepts={concepts} />}
-          {tab === "concepts" && <ConceptsTab concepts={concepts} />}
-          {tab === "chapters" && <ChaptersTab chapters={chapters} />}
+          {tab === "summary" && <SummaryTab videoDetail={videoDetail} concepts={concepts} onSeek={handleSeek} />}
+          {tab === "concepts" && <ConceptsTab concepts={concepts} onSeek={handleSeek} />}
+          {tab === "chapters" && <ChaptersTab chapters={chapters} onSeek={handleSeek} />}
           {tab === "teachme" && <TeachMeTab videoId={videoId} concepts={concepts} onStartQuiz={onStartQuiz} />}
         </div>
       </div>
@@ -509,7 +577,11 @@ export default function Workspace({ videoId, onStartQuiz }: WorkspaceProps) {
               {msg.source && (
                 <div className="flex items-center gap-2 mt-1.5 px-1">
                   <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Based on video</span>
-                  <button className="flex items-center gap-1 text-xs px-2 py-1 rounded-md font-medium" style={{ background: "var(--secondary)", color: "var(--primary)" }}>
+                  <button
+                    onClick={() => handleSeek(msg.source)}
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-md font-medium cursor-pointer hover:opacity-80 transition-all"
+                    style={{ background: "var(--secondary)", color: "var(--primary)" }}
+                  >
                     <Clock size={10} /> {msg.source} <ExternalLink size={10} />
                   </button>
                 </div>

@@ -18,22 +18,32 @@ class GeminiExtractionResult(BaseModel):
 
 class GeminiService:
     @classmethod
-    def analyze_transcript(cls, full_text: str, video_title: str) -> GeminiExtractionResult:
+    def analyze_transcript(cls, full_text: str, video_title: str, segments: Optional[List[Any]] = None) -> GeminiExtractionResult:
         """
         Analyzes the video transcript using Gemini 2.5 Flash to extract:
         - Summary
         - Key Takeaways
-        - Concepts (with difficulty and estimated timestamp)
-        - Chapters (with start_seconds and end_seconds)
+        - Concepts (with difficulty and exact transcript timestamp in seconds)
+        - Chapters (with start_seconds and end_seconds matching transcript)
         """
         if not full_text:
             return cls._fallback_analysis(video_title)
+
+        # Format timestamped text if segments are available
+        formatted_text = full_text
+        if segments:
+            lines = []
+            for s in segments:
+                st = getattr(s, 'start_seconds', 0.0) if not isinstance(s, dict) else s.get('start_seconds', 0.0)
+                txt = getattr(s, 'text', '') if not isinstance(s, dict) else s.get('text', '')
+                lines.append(f"[{int(st)}s] {txt}")
+            formatted_text = "\n".join(lines)
 
         # 1. Try real Gemini 2.5 Flash if key is configured
         if HAS_GENAI and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("placeholder"):
             try:
                 client = genai.Client(api_key=settings.GEMINI_API_KEY)
-                prompt = cls._build_extraction_prompt(full_text, video_title)
+                prompt = cls._build_extraction_prompt(formatted_text, video_title)
                 
                 response = client.models.generate_content(
                     model=settings.GENERATION_MODEL,
@@ -51,11 +61,11 @@ class GeminiService:
         return cls._fallback_analysis(video_title)
 
     @staticmethod
-    def _build_extraction_prompt(full_text: str, video_title: str) -> str:
+    def _build_extraction_prompt(transcript_text: str, video_title: str) -> str:
         # Truncate text if extremely long to fit within standard context budget
-        truncated_text = full_text[:12000]
+        truncated_text = transcript_text[:14000]
         return f"""
-You are an expert AI tutor for LearnTube AI. Analyze the following transcript for the educational video titled "{video_title}".
+You are an expert AI tutor for LearnTube AI. Analyze the following timestamped transcript for the educational video titled "{video_title}".
 
 Provide a strictly formatted JSON response containing:
 1. "summary": A concise overview (2-3 paragraphs) explaining what the video teaches.
@@ -63,17 +73,17 @@ Provide a strictly formatted JSON response containing:
 3. "concepts": A list of 4-6 key educational concepts taught in the video. Each concept must have:
    - "name": Concept title
    - "description": Clear explanation
-   - "timestamp_seconds": Estimated timestamp in seconds where it is introduced (float)
+   - "timestamp_seconds": Exact start timestamp in seconds (float, e.g. 45.0) where this concept is explained in the transcript tags like [45s]
    - "difficulty": One of "Easy", "Medium", or "Hard"
 4. "chapters": A list of 4-8 chronological chapters covering the video timeline. Each chapter must have:
    - "title": Chapter name
    - "summary": Short description of chapter content
-   - "start_seconds": Chapter start time in seconds (float)
+   - "start_seconds": Chapter start time in seconds (float) from the transcript tags
    - "end_seconds": Chapter end time in seconds (float)
 
 Respond ONLY with valid JSON. Do not include markdown code block ticks ```json or extra commentary.
 
-TRANSCRIPT:
+TIMESTAMPED TRANSCRIPT:
 {truncated_text}
 """
 

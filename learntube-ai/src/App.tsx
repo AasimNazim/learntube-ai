@@ -23,6 +23,7 @@ export default function App() {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [videoId, setVideoId] = useState<string>("");
   const [quizResults, setQuizResults] = useState<any>(null);
+  const [initialSeekTime, setInitialSeekTime] = useState<string | number | null>(null);
 
   const isPublic = PUBLIC.includes(screen);
 
@@ -56,7 +57,7 @@ export default function App() {
                 }
                 setScreen("signup");
               }}
-              onDemo={() => handleStartProcessing("https://www.youtube.com/watch?v=rfscVS0vtbw")}
+              onDemo={() => handleStartProcessing("https://www.youtube.com/watch?v=ORCuz7s5cCY")}
               onLogin={() => setScreen("login")}
               onSignUp={() => setScreen("signup")}
             />
@@ -99,7 +100,7 @@ export default function App() {
               localStorage.removeItem("learntube_token");
               setScreen("landing");
             }}
-            onDemo={() => handleStartProcessing("https://www.youtube.com/watch?v=rfscVS0vtbw")}
+            onDemo={() => handleStartProcessing("https://www.youtube.com/watch?v=ORCuz7s5cCY")}
             onNavigate={(s) => {
               if (s === "home") setScreen("home");
               else if (s === "learning") setScreen("learning");
@@ -127,6 +128,7 @@ export default function App() {
             {screen === "workspace" && (
               <Workspace
                 videoId={videoId}
+                initialSeekTime={initialSeekTime}
                 onStartQuiz={() => setScreen("quiz")}
               />
             )}
@@ -144,7 +146,10 @@ export default function App() {
             {screen === "results" && (
               <QuizResults
                 results={quizResults}
-                onReview={() => setScreen("workspace")}
+                onReview={(ts) => {
+                  if (ts) setInitialSeekTime(ts);
+                  setScreen("workspace");
+                }}
                 onRetry={() => {
                   setQuizKey((k) => k + 1);
                   setScreen("quiz");

@@ -17,7 +17,7 @@ interface QuizResultsProps {
       reason: string;
     }[];
   } | null;
-  onReview: () => void;
+  onReview: (timestamp?: string) => void;
   onRetry: () => void;
 }
 
@@ -77,7 +77,7 @@ export default function QuizResults({ results, onReview, onRetry }: QuizResultsP
             <button onClick={onRetry} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all hover:bg-slate-50" style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
               <RotateCcw size={15} /> Retake Quiz
             </button>
-            <button onClick={onReview} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
+            <button onClick={() => onReview(recs[0]?.source_timestamp || recs[0]?.ts)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
               Review Weak Areas <ArrowRight size={15} />
             </button>
           </div>
@@ -166,7 +166,7 @@ export default function QuizResults({ results, onReview, onRetry }: QuizResultsP
                     <Clock size={11} /> Recommended section: {r.section} at {r.source_timestamp || r.ts || "00:00"}
                   </div>
                 </div>
-                <button onClick={onReview} className="shrink-0 ml-4 text-xs px-3 py-2 rounded-lg font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
+                <button onClick={() => onReview(r.source_timestamp || r.ts)} className="shrink-0 ml-4 text-xs px-3 py-2 rounded-lg font-semibold transition-all hover:opacity-90" style={{ background: "var(--primary)", color: "white" }}>
                   Review →
                 </button>
               </div>

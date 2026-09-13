@@ -94,7 +94,7 @@ class ProcessingService:
         RAGVectorStore.save_transcript_chunks(db, video.id, chunks_data)
 
         # 6. Analyze via Gemini 2.5 Flash
-        ai_result = GeminiService.analyze_transcript(transcript_res.full_text, meta.title)
+        ai_result = GeminiService.analyze_transcript(transcript_res.full_text, meta.title, transcript_res.segments)
 
         # 7. Update Video summary & key takeaways
         video.summary = ai_result.summary

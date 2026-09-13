@@ -74,7 +74,7 @@ def get_current_user_optional(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """Extracts user from Authorization header if present, else returns first or demo user."""
+    """Extracts user from Authorization header if present."""
     try:
         if authorization and authorization.startswith("Bearer "):
             token = authorization.replace("Bearer ", "").strip()
@@ -83,13 +83,6 @@ def get_current_user_optional(
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     return user
-
-        demo_user = db.query(User).filter(User.email == "demo@learntube.ai").first()
-        if not demo_user:
-            demo_user = User(email="demo@learntube.ai", full_name="Alex Student")
-            db.add(demo_user)
-            db.commit()
-            db.refresh(demo_user)
-        return demo_user
+        return None
     except Exception:
         return None

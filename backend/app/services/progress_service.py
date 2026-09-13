@@ -24,22 +24,18 @@ class ProgressService:
         """
         user_id = user.id if user else None
 
-        # 1. Query videos studied ordered by newest first
-        all_videos = db.query(Video).order_by(Video.created_at.desc()).all()
+        # 1. Query videos studied by this user
         if user_id:
-            user_vids = [v for v in all_videos if v.user_id == user_id]
-            videos = user_vids if user_vids else all_videos
+            videos = db.query(Video).filter(Video.user_id == user_id).order_by(Video.created_at.desc()).all()
         else:
-            videos = all_videos
+            videos = []
         videos_count = len(videos)
 
-        # 2. Query quiz attempts
-        all_attempts = db.query(QuizAttempt).all()
+        # 2. Query quiz attempts by this user
         if user_id:
-            user_attempts = [a for a in all_attempts if a.user_id == user_id]
-            attempts = user_attempts if user_attempts else all_attempts
+            attempts = db.query(QuizAttempt).filter(QuizAttempt.user_id == user_id).all()
         else:
-            attempts = all_attempts
+            attempts = []
         quizzes_count = len(attempts)
 
         avg_score = 0.0
@@ -52,7 +48,7 @@ class ProgressService:
         minutes = int((total_seconds % 3600) // 60)
         time_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
 
-        # Stats Cards - REAL metrics from DB
+        # Stats Cards - REAL metrics from DB for current user
         stats = [
             StatCardSchema(label="Videos Studied", value=str(videos_count), icon="BookOpen", color="var(--primary)"),
             StatCardSchema(label="Quizzes Completed", value=str(quizzes_count), icon="Target", color="#7C3AED"),
@@ -60,12 +56,15 @@ class ProgressService:
             StatCardSchema(label="Learning Time", value=time_str if videos else "0m", icon="Clock", color="var(--warning)")
         ]
 
-        # Continued Learning Courses - REAL videos from DB
+        # Continued Learning Courses - REAL videos from current user
         colors = ["#4F46E5", "#7C3AED", "#059669", "#D97706"]
         courses: List[CourseItemSchema] = []
 
         for i, v in enumerate(videos[:6]):
-            prog_rec = db.query(LearningProgress).filter(LearningProgress.video_id == v.id).first()
+            prog_rec = db.query(LearningProgress).filter(
+                LearningProgress.video_id == v.id,
+                LearningProgress.user_id == user_id
+            ).first()
             prog_pct = prog_rec.completion_percent if prog_rec else 75.0
             ch_count = len(v.chapters)
 
@@ -80,7 +79,7 @@ class ProgressService:
                 color=colors[i % len(colors)]
             ))
 
-        # Strengths - REAL concepts from processed videos
+        # Strengths - REAL concepts from processed videos of current user
         strengths: List[StrengthItemSchema] = []
         seen_concepts = set()
         for v in videos:
@@ -90,13 +89,11 @@ class ProgressService:
                     score_val = min(85.0 + (len(strengths) * 3.0), 96.0)
                     strengths.append(StrengthItemSchema(concept=c.name, score=score_val))
 
-        # Learning Gaps & Reviews - ONLY from actual quiz attempts
-        all_gaps = db.query(LearningGap).all()
+        # Learning Gaps & Reviews - ONLY from actual quiz attempts of current user
         if user_id:
-            user_gaps = [g for g in all_gaps if g.user_id == user_id]
-            db_gaps = user_gaps if user_gaps else all_gaps
+            db_gaps = db.query(LearningGap).filter(LearningGap.user_id == user_id).all()
         else:
-            db_gaps = all_gaps
+            db_gaps = []
 
         gaps: List[GapItemSchema] = []
         reviews: List[ReviewItemSchema] = []

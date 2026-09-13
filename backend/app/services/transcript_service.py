@@ -50,27 +50,52 @@ class TranscriptService:
     @classmethod
     def _fetch_via_youtube_transcript_api(cls, video_id: str) -> Optional[TranscriptResponse]:
         try:
+            snippets = None
+            lang_codes = ['en', 'en-IN', 'en-US', 'en-GB', 'hi', 'ur']
             try:
                 ytt = YouTubeTranscriptApi()
-                snippets = ytt.fetch(video_id)
+                try:
+                    tx_list = ytt.list(video_id)
+                    try:
+                        tx = tx_list.find_transcript(lang_codes)
+                    except Exception:
+                        tx = list(tx_list)[0] if list(tx_list) else None
+                    if tx:
+                        snippets = tx.fetch()
+                except Exception:
+                    snippets = ytt.fetch(video_id)
             except Exception:
-                tx_list = YouTubeTranscriptApi().list(video_id)
-                tx = tx_list.find_transcript(['en', 'en-US', 'en-GB'])
-                snippets = tx.fetch()
+                pass
+
+            if not snippets and hasattr(YouTubeTranscriptApi, 'get_transcript'):
+                try:
+                    snippets = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_codes)
+                except Exception:
+                    pass
+
+            if not snippets:
+                return None
 
             segments: List[TranscriptSegment] = []
             full_text_parts: List[str] = []
 
             for s in snippets:
-                txt = getattr(s, 'text', '').strip()
+                if isinstance(s, dict):
+                    txt = str(s.get('text', '')).strip()
+                    st = float(s.get('start', 0.0))
+                    dur = float(s.get('duration', s.get('dur', 3.0)))
+                else:
+                    txt = str(getattr(s, 'text', '')).strip()
+                    st = float(getattr(s, 'start', 0.0))
+                    dur = float(getattr(s, 'duration', 3.0))
+
                 if not txt:
                     continue
-                st = round(float(getattr(s, 'start', 0.0)), 2)
-                dur = round(float(getattr(s, 'duration', 3.0)), 2)
+
                 segments.append(TranscriptSegment(
                     text=txt,
-                    start_seconds=st,
-                    duration_seconds=dur
+                    start_seconds=round(st, 2),
+                    duration_seconds=round(dur, 2)
                 ))
                 full_text_parts.append(txt)
 

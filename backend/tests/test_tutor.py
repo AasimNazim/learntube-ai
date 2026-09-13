@@ -22,6 +22,8 @@ def tutor_db():
         session.close()
         Base.metadata.drop_all(bind=engine)
 
+from app.ai.embeddings import GeminiEmbeddingService
+
 def test_rag_ask_video_and_tutor_history(tutor_db):
     video = Video(
         youtube_id="tutor_test_video",
@@ -31,13 +33,14 @@ def test_rag_ask_video_and_tutor_history(tutor_db):
     tutor_db.add(video)
     tutor_db.commit()
 
+    chunk_text = "Recursion is when a function calls itself to solve smaller subproblems."
     chunk1 = TranscriptChunk(
         video_id=video.id,
         chunk_index=0,
-        text="Recursion is when a function calls itself to solve smaller subproblems.",
+        text=chunk_text,
         start_seconds=9.42,
         end_seconds=25.0,
-        embedding=[0.1] * 768
+        embedding=GeminiEmbeddingService.generate_embedding(chunk_text)
     )
     tutor_db.add(chunk1)
     tutor_db.commit()

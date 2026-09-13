@@ -22,16 +22,18 @@ class GeminiEmbeddingService:
         # 1. Try real Gemini API if key is set
         if HAS_GENAI and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("placeholder"):
             try:
+                from google.genai import types
                 client = genai.Client(api_key=settings.GEMINI_API_KEY)
                 response = client.models.embed_content(
                     model=settings.EMBEDDING_MODEL,
-                    contents=text
+                    contents=text,
+                    config=types.EmbedContentConfig(output_dimensionality=settings.EMBEDDING_DIMENSION)
                 )
                 if response and hasattr(response, "embeddings") and response.embeddings:
                     vector = list(response.embeddings[0].values)
-                    # Normalize dimension to 768 if needed
                     if len(vector) == settings.EMBEDDING_DIMENSION:
                         return vector
+                    return vector[:settings.EMBEDDING_DIMENSION]
             except Exception:
                 pass  # Fall back to deterministic embedding on API/quota error
 

@@ -33,14 +33,8 @@ class QuizService:
         if not video:
             raise ValueError(f"Video {video_id} not found")
 
-        concept_count = len(video.concepts) if video.concepts else 0
-        duration_sec = video.duration_seconds or 0
-        if duration_sec >= 900 or concept_count >= 6:
-            target_count = 10
-        elif duration_sec >= 450 or concept_count >= 4:
-            target_count = 7
-        else:
-            target_count = 5
+        # Always set 5 MCQs per user requirement
+        target_count = 5
 
         existing_quiz = db.query(Quiz).filter(Quiz.video_id == video.id).first()
         if existing_quiz and len(existing_quiz.questions) >= 5:
@@ -57,7 +51,10 @@ class QuizService:
                 for q in existing_quiz.questions
             ])
             if len(valid_existing) >= 5:
-                return cls._to_quiz_schema(existing_quiz)
+                # Return strictly 5 questions
+                quiz_schema = cls._to_quiz_schema(existing_quiz)
+                quiz_schema.questions = quiz_schema.questions[:5]
+                return quiz_schema
 
         # Retrieve video transcript text for grounding
         t_rec = db.query(Transcript).filter(Transcript.video_id == video.id).first()
@@ -285,38 +282,48 @@ Video Context:
 "{transcript_excerpt}"
 
 TASK:
-Generate EXACTLY {count} unique, video-specific multiple choice questions.
+Generate EXACTLY {count} unique, video-specific multiple choice questions testing fundamental topics taught in this video (e.g. "What is a variable in Python?", "Which data type is used for text?").
 
 STRICT RULES FOR QUIZ QUALITY:
-1. Every question MUST be grounded strictly in the video transcript and concepts above.
-2. DO NOT repeat questions or create near-duplicate questions.
-3. Every answer option (A, B, C, D) MUST be distinct, realistic, plausible, and written in clear full sentences.
-4. ABSOLUTELY DO NOT use repetitive template phrases like 'It optimizes performance of...', 'It handles core definitions of...', 'It provides structure for...', or lazy 'All of the above' options for every question!
+1. Every question MUST be simple, clear, direct, and grounded strictly in the video transcript and concepts above.
+2. DO NOT append the full video title inside question prompts or options! Keep prompts clean and natural.
+3. Every answer option (A, B, C, D) MUST be distinct, realistic, plausible, and directly related to the programming/educational content of the video.
+4. ABSOLUTELY DO NOT use generic boilerplate options like 'legacy configuration flag', 'streaming sockets across microservices', or 'network requests'.
 5. Vary the correct_option_index across 0, 1, 2, and 3 across different questions.
 6. Provide a clear, informative explanation for why the correct option is right based on the video context.
-7. Include an accurate source_timestamp (e.g., "02:15") indicating where in the video this is explained.
+7. Include an accurate source_timestamp (e.g., "05:56" or "02:15") indicating where in the video this topic was explained.
 
 Respond ONLY with a JSON array of question objects matching this exact structure:
 [
   {{
-    "concept_name": "Concept Name",
-    "prompt": "Specific question testing understanding of a concept from this video?",
+    "concept_name": "Variables & Data Types",
+    "prompt": "What is the main purpose of a variable in Python?",
     "options": [
-      "Plausible Option A explaining one perspective",
-      "Plausible Option B explaining another perspective",
-      "Correct Option C containing the accurate explanation from transcript",
-      "Plausible Option D explaining a common misconception"
+      "To store data values in memory for reuse",
+      "To run external shell commands",
+      "To delete files from the disk",
+      "To compile Python into C code"
     ],
-    "correct_option_index": 2,
-    "explanation": "Clear explanation citing the video content.",
+    "correct_option_index": 0,
+    "explanation": "Variables act as containers to store data values in memory.",
     "source_timestamp": "02:15"
   }}
 ]
 """
-                resp = client.models.generate_content(
-                    model=settings.GENERATION_MODEL,
-                    contents=prompt
-                )
+                try:
+                    resp = client.models.generate_content(
+                        model=settings.GENERATION_MODEL,
+                        contents=prompt
+                    )
+                except Exception as model_err:
+                    import logging
+                    logging.warning(f"Quiz generation error with {settings.GENERATION_MODEL}: {model_err}. Trying alternate model...")
+                    alt_model = "gemini-flash-latest" if settings.GENERATION_MODEL != "gemini-flash-latest" else "gemini-3.5-flash-lite"
+                    resp = client.models.generate_content(
+                        model=alt_model,
+                        contents=prompt
+                    )
+
                 if resp and hasattr(resp, "text") and resp.text:
                     clean = resp.text.strip().replace("```json", "").replace("```", "").strip()
                     data = json.loads(clean)
@@ -328,7 +335,7 @@ Respond ONLY with a JSON array of question objects matching this exact structure
         if len(valid_questions) >= count:
             return valid_questions[:count]
 
-        # Generate non-repetitive fallback questions for any remaining slots
+        # Generate clean, concept-specific fallback questions for any remaining slots
         fallback_questions = cls._generate_concept_fallback_questions(title, concepts, summary, count - len(valid_questions))
         combined = valid_questions + fallback_questions
         return cls._validate_and_deduplicate_questions(combined)[:count]
@@ -387,7 +394,7 @@ Respond ONLY with a JSON array of question objects matching this exact structure
         summary: str,
         count: int
     ) -> List[Dict[str, Any]]:
-        """Generates distinct, concept-specific fallback questions when AI is unavailable."""
+        """Generates clean, concept-specific fallback questions when AI API is unreachable."""
         fallback_list = []
         available_concepts = list(concepts) if concepts else []
 
@@ -395,37 +402,37 @@ Respond ONLY with a JSON array of question objects matching this exact structure
             if i < len(available_concepts):
                 c = available_concepts[i]
                 c_name = c.name
-                c_desc = c.description or f"Key topic in {title}."
+                c_desc = c.description or "Core programming topic."
                 c_ts = format_timestamp(c.timestamp_seconds) if c.timestamp_seconds else f"0{i+1}:30"
             else:
-                c_name = f"Key Topic {i+1}"
-                c_desc = f"Main technical concept in {title}."
+                c_name = f"Concept {i+1}"
+                c_desc = "Key topic taught in this video."
                 c_ts = f"0{i+1}:45"
 
             correct_idx = i % 4
 
             if i % 3 == 0:
-                prompt_str = f"What is the primary function of '{c_name}' as explained in '{title}'?"
-                opt_a = f"{c_name} defines the core logic: {c_desc}"
-                opt_b = f"{c_name} acts as an optional logging mechanism without altering workflow."
-                opt_c = f"{c_name} is used strictly for offline database serialization."
-                opt_d = f"{c_name} replaces standard error handling across external services."
+                prompt_str = f"What is the main purpose of '{c_name}' in Python?"
+                opt_a = f"{c_name} defines key logic: {c_desc}"
+                opt_b = f"{c_name} is used only to clear terminal output."
+                opt_c = f"{c_name} deletes inactive variable references automatically."
+                opt_d = f"{c_name} converts all code into HTML markup."
                 raw_options = [opt_a, opt_b, opt_c, opt_d]
                 correct_opt = opt_a
             elif i % 3 == 1:
-                prompt_str = f"How does '{c_name}' contribute to the overall workflow in '{title}'?"
-                opt_a = f"By managing third-party dependency injection automatically."
-                opt_b = f"By establishing key principles ({c_desc}) necessary for execution."
-                opt_c = f"By bypassing step-by-step verification procedures."
-                opt_d = f"By converting runtime exceptions into static compiler warnings."
+                prompt_str = f"Which of the following best describes '{c_name}' in this lesson?"
+                opt_a = f"It modifies system environment variables globally."
+                opt_b = f"It focuses on {c_desc} to build foundational understanding."
+                opt_c = f"It bypasses standard type checking rules completely."
+                opt_d = f"It formats error messages into JSON files."
                 raw_options = [opt_a, opt_b, opt_c, opt_d]
                 correct_opt = opt_b
             else:
-                prompt_str = f"Which statement best summarizes '{c_name}' in this lesson?"
-                opt_a = f"It represents a legacy configuration flag no longer used in modern builds."
-                opt_b = f"It provides real-time streaming sockets across microservices."
-                opt_c = f"It focuses on {c_desc} to build foundational understanding."
-                opt_d = f"It isolates network requests from main execution threads."
+                prompt_str = f"Why is understanding '{c_name}' important when learning Python?"
+                opt_a = f"Because it causes syntax errors in every Python script."
+                opt_b = f"Because it disables standard memory management."
+                opt_c = f"Because it provides key principles ({c_desc}) required for writing correct code."
+                opt_d = f"Because it is required to install third-party packages."
                 raw_options = [opt_a, opt_b, opt_c, opt_d]
                 correct_opt = opt_c
 
@@ -438,7 +445,7 @@ Respond ONLY with a JSON array of question objects matching this exact structure
                 "prompt": prompt_str,
                 "options": final_options,
                 "correct_option_index": correct_idx,
-                "explanation": f"In '{title}', {c_name} focuses on: {c_desc}",
+                "explanation": f"{c_name} is explained as: {c_desc}",
                 "source_timestamp": c_ts
             })
 

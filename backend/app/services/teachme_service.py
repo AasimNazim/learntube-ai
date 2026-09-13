@@ -49,10 +49,20 @@ Respond ONLY with valid JSON containing:
    - "correct_option_index": Integer index (0-3) of the correct answer
    - "explanation": Brief explanation why it is correct.
 """
-                resp = client.models.generate_content(
-                    model=settings.GENERATION_MODEL,
-                    contents=prompt
-                )
+                try:
+                    resp = client.models.generate_content(
+                        model=settings.GENERATION_MODEL,
+                        contents=prompt
+                    )
+                except Exception as model_err:
+                    import logging
+                    logging.warning(f"TeachMe generation error with {settings.GENERATION_MODEL}: {model_err}. Trying alternate model...")
+                    alt_model = "gemini-3.5-flash-lite" if settings.GENERATION_MODEL != "gemini-3.5-flash-lite" else "gemini-flash-latest"
+                    resp = client.models.generate_content(
+                        model=alt_model,
+                        contents=prompt
+                    )
+
                 if resp and hasattr(resp, "text") and resp.text:
                     clean = resp.text.strip().replace("```json", "").replace("```", "").strip()
                     data = json.loads(clean)
@@ -65,7 +75,9 @@ Respond ONLY with valid JSON containing:
                             steps=steps,
                             quick_check=qc
                         )
-            except Exception:
+            except Exception as e:
+                import logging
+                logging.error(f"TeachMe error: {e}")
                 pass
 
         # Fallback structured lesson
