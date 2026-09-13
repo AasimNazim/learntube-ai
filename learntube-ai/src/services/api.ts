@@ -10,7 +10,7 @@ import {
   LearningProgress
 } from "../types/learning";
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const apiBaseUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://127.0.0.1:8000")).replace(/\/$/, "");
 
 export class ApiError extends Error {
   status: number;
